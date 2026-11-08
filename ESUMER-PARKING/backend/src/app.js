@@ -1,0 +1,22 @@
+import express from 'express';
+import cors from 'cors';
+import auth from './routes/auth.routes.js';
+import users from './routes/users.routes.js';
+import vehicles from './routes/vehicles.routes.js';
+import parking from './routes/parking.routes.js';
+import reservations from './routes/reservations.routes.js';
+import history from './routes/history.routes.js';
+import { RATE_PER_HOUR } from './config/env.js';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.get('/api/config', (req, res) => res.json({ ratePerHour: RATE_PER_HOUR }));
+app.use('/api/auth', auth);
+app.use('/api/users', users);
+app.use('/api/vehicles', vehicles);
+app.use('/api/parking', parking);
+app.use('/api/reservations', reservations);
+app.use('/api/history', history);
+app.use((req, res) => res.status(404).json({ message: 'Ruta no encontrada.' }));
+export default app;

@@ -1,0 +1,9 @@
+{
+  "name": "esumer-parking",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "abrir": "node abrir.js",
+    "start": "node abrir.js"
+  }
+}
