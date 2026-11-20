@@ -98,3 +98,68 @@ th{color:var(--muted);font-weight:500}tr:last-child td{border-bottom:0}
 .slot svg{display:block;width:100%;height:100%;overflow:visible}
 .slot:hover{transform:translateY(-2px);filter:brightness(1.3)}
 .slot.sel{outline:3px solid var(--accent);outline-offset:1px;box-shadow:0 0 26px rgba(245,197,66,.6);z-index:3}
+/* ===== VIDA: fondo animado y detalles ===== */
+.backdrop{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.bd-glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.2;animation:drift 18s ease-in-out infinite alternate}
+.g1{width:460px;height:460px;left:-120px;top:-100px;background:#f5c542}
+.g2{width:520px;height:520px;right:-160px;bottom:80px;background:#2fbf9b;animation-duration:24s}
+.g3{width:380px;height:380px;right:22%;top:12%;background:#7c8cff;opacity:.14;animation-duration:30s}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(60px,40px) scale(1.15)}}
+.bd-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 20%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 30%,#000 20%,transparent 75%)}
+.bd-p{position:absolute;bottom:130px;width:30px;height:30px;border-radius:7px;border:2px solid rgba(245,197,66,.45);color:rgba(245,197,66,.55);display:grid;place-items:center;font:700 .95rem Sora,sans-serif;opacity:0;animation:floatUp 21s linear infinite}
+@keyframes floatUp{0%{transform:translateY(0);opacity:0}15%{opacity:.7}85%{opacity:.5}100%{transform:translateY(-70vh);opacity:0}}
+.bd-road{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(180deg,transparent,rgba(32,38,47,.92) 38%);border-top:1px solid rgba(255,255,255,.04)}
+.bd-lane{position:absolute;left:0;right:0;top:62%;height:3px;background:repeating-linear-gradient(90deg,rgba(245,197,66,.45) 0 28px,transparent 28px 56px);animation:lane 2s linear infinite}
+@keyframes lane{from{background-position-x:0}to{background-position-x:56px}}
+.bd-car{position:absolute;left:0;opacity:.85;will-change:transform}
+.bd-car.r{bottom:66px;animation:driveR 40s linear infinite}
+.bd-car.l{bottom:12px;animation:driveL 46s linear infinite}
+.bd-car.r.b{animation-duration:55s;animation-delay:-24s}
+.bd-car.l.a{animation-delay:-12s}
+.bd-car.l.b{animation-duration:62s;animation-delay:-38s}
+@keyframes driveR{from{transform:translateX(-240px)}to{transform:translateX(calc(100vw + 240px))}}
+@keyframes driveL{from{transform:translateX(calc(100vw + 240px)) scaleX(-1)}to{transform:translateX(-240px) scaleX(-1)}}
+
+/* capas: el contenido va sobre el fondo */
+.shell{position:relative}
+.main{position:relative;z-index:1}
+.sidebar{z-index:2;background:rgba(27,32,41,.8);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.topbar{background:rgba(27,32,41,.85);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+
+/* tarjetas de vidrio */
+.card,.stat,.table-wrap{background:linear-gradient(180deg,rgba(38,46,60,.72),rgba(27,32,41,.72));-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-color:rgba(255,255,255,.07);box-shadow:0 8px 28px rgba(0,0,0,.28);transition:transform .2s,border-color .2s,box-shadow .2s}
+.card:hover,.stat:hover{transform:translateY(-3px);border-color:rgba(245,197,66,.4);box-shadow:0 14px 34px rgba(0,0,0,.36)}
+.detail:hover,.parking-layout .card:hover{transform:none}
+.stat{position:relative;overflow:hidden}
+.stat::before{content:"";position:absolute;left:0;top:0;width:100%;height:3px;background:linear-gradient(90deg,var(--accent),transparent)}
+
+/* animación de entrada de cada pantalla */
+.content>*{animation:fadeUp .5s ease backwards}
+.content>*:nth-child(2){animation-delay:.07s}
+.content>*:nth-child(3){animation-delay:.14s}
+.content>*:nth-child(4){animation-delay:.21s}
+.content>*:nth-child(n+5){animation-delay:.28s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* botones, logo y detalles */
+.btn{transition:transform .15s,box-shadow .15s,background .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn.primary{box-shadow:0 6px 20px rgba(245,197,66,.25)}
+.btn.primary:hover:not(:disabled){box-shadow:0 8px 26px rgba(245,197,66,.45)}
+.brand-mark{box-shadow:0 0 18px rgba(245,197,66,.5);animation:glow 3s ease-in-out infinite alternate}
+@keyframes glow{to{box-shadow:0 0 28px rgba(245,197,66,.85)}}
+.legend .dot.s-free{animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 5px rgba(47,191,155,.25)}}
+.map{box-shadow:0 10px 36px rgba(0,0,0,.4)}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:rgba(255,255,255,.04)}
+
+/* login y registro */
+.auth-page{position:relative;background:none}
+.auth-card{position:relative;z-index:1;background:rgba(27,32,41,.78);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 24px 60px rgba(0,0,0,.5);animation:fadeUp .6s ease backwards}
+
+/* accesibilidad: sin movimiento si el usuario lo pidió */
+@media(prefers-reduced-motion:reduce){
+  .bd-car,.bd-p{display:none}
+  .backdrop *,.content>*,.auth-card,.brand-mark,.legend .dot{animation:none!important}
+}

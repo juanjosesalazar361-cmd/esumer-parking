@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import Sidebar from '../components/Sidebar.jsx';
+import Backdrop from '../components/Backdrop.jsx';
 
 export default function DashboardLayout() {
   const [open, setOpen] = useState(false);
   return (
     <div className="shell">
+      <Backdrop />
       <Sidebar open={open} onClose={() => setOpen(false)} />
       <div className="main">
         <header className="topbar">
