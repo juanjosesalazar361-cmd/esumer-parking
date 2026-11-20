@@ -1,12 +1,12 @@
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../config/env.js';
-import { users } from '../data/db.js';
+import { q } from '../config/db.js';
 
-export function auth(req, res, next) {
+export async function auth(req, res, next) {
   const token = (req.headers.authorization || '').replace('Bearer ', '');
   try {
     const { id } = jwt.verify(token, JWT_SECRET);
-    const user = users.find(u => u.id === id);
+    const [user] = await q('SELECT id, name, email, password, role, type FROM users WHERE id = $1', [id]);
     if (!user) throw new Error();
     req.user = user; next();
   } catch { res.status(401).json({ message: 'Sesión inválida. Inicia sesión de nuevo.' }); }

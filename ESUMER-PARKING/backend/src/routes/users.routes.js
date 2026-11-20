@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { users, vehicles } from '../data/db.js';
+import { q } from '../config/db.js';
 import { auth, adminOnly } from '../middlewares/auth.js';
+import { h } from '../middlewares/async.js';
 
 const r = Router();
-r.get('/', auth, adminOnly, (req, res) =>
-  res.json(users.map(({ password, ...u }) => ({ ...u, vehicles: vehicles.filter(v => v.userId === u.id).length }))));
+r.get('/', auth, adminOnly, h(async (req, res) => res.json(await q(
+  `SELECT u.id, u.name, u.email, u.role, u.type, (SELECT COUNT(*)::int FROM vehicles v WHERE v.user_id = u.id) AS vehicles FROM users u ORDER BY u.id`))));
 export default r;

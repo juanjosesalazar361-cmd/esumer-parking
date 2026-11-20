@@ -1,58 +1,34 @@
-// Datos en memoria. En la etapa 2 se reemplaza por PostgreSQL manteniendo los mismos nombres de entidades.
-import bcrypt from 'bcryptjs';
+import { q } from '../config/db.js';
 
-const make = (zone, prefix, n, cols = 10) =>
-  Array.from({ length: n }, (_, i) => ({
-    id: `${prefix}-${String(i + 1).padStart(2, '0')}`,
-    zone, row: Math.floor(i / cols), col: i % cols, status: 'free', // free | occupied | maintenance
-  }));
+export const log = (user, action, detail = '') =>
+  q('INSERT INTO history(user_id, user_name, action, detail) VALUES ($1,$2,$3,$4)', [user.id, user.name, action, detail]);
 
-export const spaces = [...make('Entrada', 'E', 20), ...make('Piso 1', 'P1', 30), ...make('Piso 2', 'P2', 30)];
-spaces.forEach((s, i) => { if (i % 4 === 1) s.status = 'occupied'; });
-spaces[7].status = 'maintenance';
+// Marca como finalizadas las reservas vencidas y deja constancia en el historial
+export const expireReservations = () => q(`
+  WITH u AS (UPDATE reservations SET status='finished' WHERE status='active' AND end_at <= now() RETURNING user_id, space_id)
+  INSERT INTO history(user_id, user_name, action, detail)
+  SELECT u.user_id, users.name, 'Reserva finalizada', u.space_id FROM u JOIN users ON users.id = u.user_id`);
 
-export const users = [
-  { id: 1, name: 'Administrador ESUMER', email: 'admin@esumer.edu.co', password: bcrypt.hashSync('admin123', 8), role: 'admin', type: 'Administrativo' },
-];
-export const vehicles = [];
-export const reservations = []; // {id,userId,vehicleId,spaceId,start,end,hours,total,status:active|cancelled|finished,paymentRef}
-export const history = [];
+// Estado de cada espacio calculado desde las reservas: si se cancelan o vencen, el espacio se libera solo.
+// vehicle = vehículo de la reserva en curso (solo lo ve su dueño o el admin); mine = reserva propia (en curso o futura).
+const car = (r, v) => `json_build_object('id', ${r}.id, 'start', ${r}.start_at, 'end', ${r}.end_at, 'plate', ${v}.plate, 'brand', ${v}.brand, 'color', ${v}.color, 'type', ${v}.type)`;
 
-let seq = 100;
-export const nextId = () => ++seq;
-export const log = (user, action, detail) =>
-  history.unshift({ id: nextId(), userId: user.id, userName: user.name, action, detail, at: new Date().toISOString() });
-
-// Marca como finalizadas las reservas vencidas
-export function expireReservations() {
-  const now = Date.now();
-  reservations.filter(r => r.status === 'active' && new Date(r.end) <= now).forEach(r => {
-    r.status = 'finished';
-    log({ id: r.userId, name: users.find(u => u.id === r.userId)?.name || '-' }, 'Reserva finalizada', r.spaceId);
-  });
-}
-
-// Estado de cada espacio, calculado desde las reservas: si se cancelan o vencen, el espacio se libera solo.
-export function spacesView(viewer) {
-  expireReservations();
-  const now = Date.now();
-  const info = r => {
-    const v = vehicles.find(x => x.id === r.vehicleId);
-    return { id: r.id, start: r.start, end: r.end, plate: v?.plate, brand: v?.brand, color: v?.color, type: v?.type };
-  };
-  return spaces.map(s => {
-    const act = reservations.filter(r => r.spaceId === s.id && r.status === 'active' && new Date(r.end) > now);
-    const cur = act.find(r => new Date(r.start) <= now);
-    const upcoming = act.filter(r => new Date(r.start) > now).map(r => ({ start: r.start, end: r.end }));
-    const mine = act.find(r => r.userId === viewer?.id);
-    const canSee = cur && (viewer?.role === 'admin' || cur.userId === viewer?.id);
-    return {
-      ...s,
-      status: cur && s.status === 'free' ? 'reserved' : s.status,
-      reservedUntil: cur?.end || null,
-      upcoming,
-      vehicle: canSee ? info(cur) : null, // la placa solo la ve el dueño o el admin
-      mine: mine ? info(mine) : null,
-    };
-  });
+export async function spacesView(viewer) {
+  await expireReservations();
+  return q(`
+    SELECT s.id, s.zone, s.pos_row AS "row", s.pos_col AS "col",
+      CASE WHEN s.status = 'free' AND cur.id IS NOT NULL THEN 'reserved' ELSE s.status END AS status,
+      cur.end_at AS "reservedUntil",
+      COALESCE((SELECT json_agg(json_build_object('start', r.start_at, 'end', r.end_at) ORDER BY r.start_at)
+                FROM reservations r WHERE r.space_id = s.id AND r.status = 'active' AND r.start_at > now()), '[]'::json) AS upcoming,
+      CASE WHEN cur.id IS NOT NULL AND ($2 OR cur.user_id = $1) THEN ${car('cur', 'cv')} END AS vehicle,
+      CASE WHEN mine.id IS NOT NULL THEN ${car('mine', 'mv')} END AS mine
+    FROM spaces s
+    LEFT JOIN LATERAL (SELECT r.* FROM reservations r WHERE r.space_id = s.id AND r.status = 'active'
+                       AND r.start_at <= now() AND r.end_at > now() LIMIT 1) cur ON true
+    LEFT JOIN vehicles cv ON cv.id = cur.vehicle_id
+    LEFT JOIN LATERAL (SELECT r.* FROM reservations r WHERE r.space_id = s.id AND r.status = 'active'
+                       AND r.end_at > now() AND r.user_id = $1 ORDER BY r.start_at LIMIT 1) mine ON true
+    LEFT JOIN vehicles mv ON mv.id = mine.vehicle_id
+    ORDER BY s.pos_row, s.pos_col`, [viewer?.id ?? 0, viewer?.role === 'admin']);
 }

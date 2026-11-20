@@ -19,4 +19,9 @@ app.use('/api/parking', parking);
 app.use('/api/reservations', reservations);
 app.use('/api/history', history);
 app.use((req, res) => res.status(404).json({ message: 'Ruta no encontrada.' }));
+app.use((err, req, res, next) => {
+  console.error(err);
+  const dup = err.code === '23505';
+  res.status(dup ? 409 : 500).json({ message: dup ? 'Ese registro ya existe.' : 'Error del servidor. Intenta de nuevo.' });
+});
 export default app;
