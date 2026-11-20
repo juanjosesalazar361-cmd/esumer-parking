@@ -13,6 +13,8 @@ export default function Parking() {
 
   const load = () => api.spaces().then(setSpaces);
   useEffect(() => { load(); api.vehicles().then(v => { setVehicles(v); if (v[0]) setForm(f => ({ ...f, vehicleId: v[0].id })); }); }, []);
+  // El mapa se actualiza solo cada 10 segundos (reservas nuevas, canceladas o vencidas)
+  useEffect(() => { const t = setInterval(load, 10000); return () => clearInterval(t); }, []);
 
   const inZone = useMemo(() => spaces.filter(s => s.zone === zone), [spaces, zone]);
   const current = sel && spaces.find(s => s.id === sel.id);
@@ -24,6 +26,11 @@ export default function Parking() {
       const r = await api.reserve({ spaceId: current.id, ...form, start: new Date(form.start).toISOString(), end: new Date(form.end).toISOString() });
       setMsg({ ok: true, text: `Reserva confirmada. Pago simulado ${r.paymentRef} por ${money(r.total)}.` }); load();
     } catch (x) { setMsg({ ok: false, text: x.message }); }
+  };
+
+  const cancelMine = async () => {
+    try { await api.cancel(current.mine.id); setMsg({ ok: true, text: 'Reserva cancelada. El espacio quedó libre.' }); load(); }
+    catch (x) { setMsg({ ok: false, text: x.message }); }
   };
 
   return (
@@ -39,8 +46,15 @@ export default function Parking() {
               <h2>{current.id}</h2>
               <p><span className={`badge s-${current.status}`}>{LABEL[current.status]}</span> · {current.zone}</p>
               {current.reservedUntil && <p className="muted">Reservado hasta {fmt(current.reservedUntil)}</p>}
+              {current.vehicle && <p><strong>{current.vehicle.plate}</strong> · {current.vehicle.brand} · {current.vehicle.color}</p>}
               {current.upcoming?.length > 0 && <p className="muted">Próximas reservas: {current.upcoming.map(u => fmt(u.start)).join(', ')}</p>}
-              {current.status === 'free' && (vehicles.length === 0 ? <div className="alert">Registra un vehículo en “Mis vehículos” para poder reservar.</div> : (
+              {current.mine && (
+                <div className="ok">
+                  Tu reserva: {fmt(current.mine.start)} → {fmt(current.mine.end)}
+                  <button className="btn danger small" onClick={cancelMine} style={{ marginTop: 8 }}>Cancelar reserva</button>
+                </div>
+              )}
+              {current.status === 'free' && !current.mine && (vehicles.length === 0 ? <div className="alert">Registra un vehículo en “Mis vehículos” para poder reservar.</div> : (
                 <form onSubmit={reserve}>
                   <label>Vehículo<select value={form.vehicleId} onChange={e => setForm({ ...form, vehicleId: e.target.value })}>{vehicles.map(v => <option key={v.id} value={v.id}>{v.plate} · {v.brand}</option>)}</select></label>
                   <label>Inicio<input type="datetime-local" value={form.start} onChange={e => setForm({ ...form, start: e.target.value })} /></label>

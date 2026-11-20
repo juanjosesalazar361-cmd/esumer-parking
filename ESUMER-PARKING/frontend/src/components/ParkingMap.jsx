@@ -4,10 +4,12 @@ import { ZoomOut } from 'lucide-react';
 const BW = 54, BH = 86, LANE = 64, PAD = 20, SIDE = 74, COLS = 10, H = 480;
 const X0 = PAD + SIDE;
 const CAR_COLORS = ['#c0392b', '#2c7fb8', '#d5d8dc', '#7f8c8d', '#e1b12c', '#27ae60', '#8e44ad', '#ecf0f1'];
+const COLOR_HEX = { rojo: '#c0392b', azul: '#2c7fb8', negro: '#2b2f36', blanco: '#ecf0f1', gris: '#7f8c8d', plata: '#b8c0cc', verde: '#27ae60', amarillo: '#e1b12c', naranja: '#e67e22', morado: '#8e44ad' };
 const TINT = { free: '#2fbf9b', reserved: '#7c8cff', occupied: '#e5584f', maintenance: '#8b95a5' };
 const LABEL = { free: 'Libre', reserved: 'Reservado', occupied: 'Ocupado', maintenance: 'En mantenimiento' };
 const ZONE_NAME = { Entrada: 'ENTRADA', 'Piso 1': 'NIVEL 1', 'Piso 2': 'NIVEL 2' };
 const hash = id => [...id].reduce((a, c) => a + c.charCodeAt(0), 0);
+const colorOf = (name, fallback) => COLOR_HEX[(name || '').toLowerCase().trim()] || fallback;
 
 // Calcula la posición de cada bahía: filas en pares espalda con espalda, separadas por carriles.
 function layout(rows) {
@@ -48,6 +50,28 @@ function Moto({ color, flip }) {
   );
 }
 
+// Placa del vehículo reservado
+function Plate({ text }) {
+  return (
+    <g>
+      <rect x="10" y="39" width="34" height="12" rx="2" fill="#f5c542" stroke="#13171d" strokeWidth=".8" />
+      <text x="27" y="48" textAnchor="middle" fontSize="8" fontWeight="700" fontFamily="Sora, sans-serif" fill="#13171d">{text}</text>
+    </g>
+  );
+}
+// Vehículo reservado (con su color y placa). ghost = reserva propia que empieza más tarde.
+function Booked({ v, color, up, ghost }) {
+  return (
+    <g opacity={ghost ? 0.55 : 1}>
+      {v?.type === 'Motocicleta' ? <Moto color={colorOf(v.color, color)} flip={up} /> : <Car color={colorOf(v?.color, color)} flip={up} />}
+      {v?.plate && <Plate text={v.plate} />}
+      {ghost
+        ? <rect x="3" y="3" width="48" height="80" rx="4" fill="none" stroke="#f5c542" strokeWidth="2" strokeDasharray="4 3" />
+        : <><circle cx="44" cy="14" r="8" fill={TINT.reserved} /><text x="44" y="18" textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff">R</text></>}
+    </g>
+  );
+}
+
 function SlotArt({ s, open }) {
   const up = open === 'up', h = hash(s.id), color = CAR_COLORS[h % CAR_COLORS.length];
   const back = up ? 85 : 1;
@@ -56,8 +80,9 @@ function SlotArt({ s, open }) {
       <rect width={BW} height={BH} fill={TINT[s.status]} opacity={s.status === 'occupied' ? 0.1 : 0.17} />
       <path d={`M1 0V${BH}M${BW - 1} 0V${BH}M0 ${back}H${BW}`} stroke="#e8ebf0" strokeOpacity=".55" strokeWidth="2" fill="none" />
       {s.status === 'occupied' && (h % 7 === 0 ? <Moto color={color} flip={up} /> : <Car color={color} flip={up} />)}
-      {s.status === 'free' && <text x="27" y="53" textAnchor="middle" fontSize="30" fontWeight="700" fontFamily="Sora, sans-serif" fill={TINT.free} opacity=".35">P</text>}
-      {s.status === 'reserved' && (<g><circle cx="27" cy="43" r="15" fill={TINT.reserved} /><text x="27" y="50" textAnchor="middle" fontSize="20" fontWeight="700" fontFamily="Sora, sans-serif" fill="#fff">R</text></g>)}
+      {s.status === 'free' && !s.mine && <text x="27" y="53" textAnchor="middle" fontSize="30" fontWeight="700" fontFamily="Sora, sans-serif" fill={TINT.free} opacity=".35">P</text>}
+      {s.status === 'free' && s.mine && <Booked v={s.mine} color={color} up={up} ghost />}
+      {s.status === 'reserved' && <Booked v={s.vehicle} color={color} up={up} />}
       {s.status === 'maintenance' && (<g>
         <path d="M6 10L48 76M48 10L6 76" stroke="#8b95a5" strokeOpacity=".25" strokeWidth="3" />
         <rect x="14" y="60" width="26" height="5" rx="1.5" fill="#f08a24" />

@@ -32,12 +32,27 @@ export function expireReservations() {
   });
 }
 
-export function spacesView() {
+// Estado de cada espacio, calculado desde las reservas: si se cancelan o vencen, el espacio se libera solo.
+export function spacesView(viewer) {
   expireReservations();
   const now = Date.now();
+  const info = r => {
+    const v = vehicles.find(x => x.id === r.vehicleId);
+    return { id: r.id, start: r.start, end: r.end, plate: v?.plate, brand: v?.brand, color: v?.color, type: v?.type };
+  };
   return spaces.map(s => {
-    const cur = reservations.find(r => r.spaceId === s.id && r.status === 'active' && new Date(r.start) <= now && new Date(r.end) > now);
-    const upcoming = reservations.filter(r => r.spaceId === s.id && r.status === 'active' && new Date(r.start) > now).map(r => ({ start: r.start, end: r.end }));
-    return { ...s, status: cur && s.status === 'free' ? 'reserved' : s.status, reservedUntil: cur?.end || null, upcoming };
+    const act = reservations.filter(r => r.spaceId === s.id && r.status === 'active' && new Date(r.end) > now);
+    const cur = act.find(r => new Date(r.start) <= now);
+    const upcoming = act.filter(r => new Date(r.start) > now).map(r => ({ start: r.start, end: r.end }));
+    const mine = act.find(r => r.userId === viewer?.id);
+    const canSee = cur && (viewer?.role === 'admin' || cur.userId === viewer?.id);
+    return {
+      ...s,
+      status: cur && s.status === 'free' ? 'reserved' : s.status,
+      reservedUntil: cur?.end || null,
+      upcoming,
+      vehicle: canSee ? info(cur) : null, // la placa solo la ve el dueño o el admin
+      mine: mine ? info(mine) : null,
+    };
   });
 }
