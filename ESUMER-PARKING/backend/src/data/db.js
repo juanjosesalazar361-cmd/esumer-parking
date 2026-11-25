@@ -9,8 +9,9 @@ export const expireReservations = () => q(`
   INSERT INTO history(user_id, user_name, action, detail)
   SELECT u.user_id, users.name, 'Reserva finalizada', u.space_id FROM u JOIN users ON users.id = u.user_id`);
 
-// Estado de cada espacio calculado desde las reservas: si se cancelan o vencen, el espacio se libera solo.
-// vehicle = vehículo de la reserva en curso (solo lo ve su dueño o el admin); mine = reserva propia (en curso o futura).
+// Un espacio con una reserva activa (que no ha terminado) se muestra como reservado desde que se hace la reserva.
+// Si se cancela o vence, vuelve a libre solo.
+// vehicle = vehículo de la reserva (solo lo ve su dueño o el admin); mine = reserva propia.
 const car = (r, v) => `json_build_object('id', ${r}.id, 'start', ${r}.start_at, 'end', ${r}.end_at, 'plate', ${v}.plate, 'brand', ${v}.brand, 'color', ${v}.color, 'type', ${v}.type)`;
 
 export async function spacesView(viewer) {
@@ -18,14 +19,14 @@ export async function spacesView(viewer) {
   return q(`
     SELECT s.id, s.zone, s.pos_row AS "row", s.pos_col AS "col",
       CASE WHEN s.status = 'free' AND cur.id IS NOT NULL THEN 'reserved' ELSE s.status END AS status,
+      cur.start_at AS "reservedFrom",
       cur.end_at AS "reservedUntil",
-      COALESCE((SELECT json_agg(json_build_object('start', r.start_at, 'end', r.end_at) ORDER BY r.start_at)
-                FROM reservations r WHERE r.space_id = s.id AND r.status = 'active' AND r.start_at > now()), '[]'::json) AS upcoming,
+      '[]'::json AS upcoming,
       CASE WHEN cur.id IS NOT NULL AND ($2 OR cur.user_id = $1) THEN ${car('cur', 'cv')} END AS vehicle,
       CASE WHEN mine.id IS NOT NULL THEN ${car('mine', 'mv')} END AS mine
     FROM spaces s
     LEFT JOIN LATERAL (SELECT r.* FROM reservations r WHERE r.space_id = s.id AND r.status = 'active'
-                       AND r.start_at <= now() AND r.end_at > now() LIMIT 1) cur ON true
+                       AND r.end_at > now() ORDER BY r.start_at LIMIT 1) cur ON true
     LEFT JOIN vehicles cv ON cv.id = cur.vehicle_id
     LEFT JOIN LATERAL (SELECT r.* FROM reservations r WHERE r.space_id = s.id AND r.status = 'active'
                        AND r.end_at > now() AND r.user_id = $1 ORDER BY r.start_at LIMIT 1) mine ON true

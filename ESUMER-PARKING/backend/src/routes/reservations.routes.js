@@ -9,12 +9,12 @@ const r = Router();
 r.use(auth);
 const COLS = `id, user_id AS "userId", vehicle_id AS "vehicleId", space_id AS "spaceId", start_at AS "start", end_at AS "end", hours, total, status, payment_ref AS "paymentRef"`;
 
-// ¿Hay otra reserva activa que se cruce con [start, end) en este espacio?
+// ¿Hay otra reserva activa que se cruce con [start, end) en este espacio? (se usa al extender)
 const overlap = async (c, spaceId, start, end, ignoreId = 0) =>
   (await c.query(`SELECT 1 FROM reservations WHERE id <> $4 AND space_id = $1 AND status = 'active'
                   AND start_at < $3::timestamptz AND $2::timestamptz < end_at LIMIT 1`, [spaceId, start, end, ignoreId])).rowCount > 0;
 
-// Transacción con bloqueo por espacio: evita que dos personas reserven a la vez el mismo horario
+// Transacción con bloqueo por espacio: evita que dos personas reserven a la vez el mismo espacio
 async function withSpaceLock(spaceId, fn) {
   const c = await pool.connect();
   try {
@@ -48,7 +48,9 @@ r.post('/', h(async (req, res) => {
   const hours = Math.ceil((end - start) / 3600000);
   const ref = `SIM-${Date.now().toString(36).toUpperCase()}`;
   const out = await withSpaceLock(spaceId, async c => {
-    if (await overlap(c, spaceId, start, end)) return { error: 'Ese espacio ya está reservado en ese horario.' };
+    // Un espacio solo puede tener una reserva activa a la vez
+    const taken = await c.query(`SELECT 1 FROM reservations WHERE space_id = $1 AND status = 'active' AND end_at > now() LIMIT 1`, [spaceId]);
+    if (taken.rowCount > 0) return { error: 'Este espacio ya está reservado.' };
     const { rows } = await c.query(`INSERT INTO reservations(user_id, vehicle_id, space_id, start_at, end_at, hours, total, payment_ref)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING ${COLS}`, [req.user.id, vehicle.id, spaceId, start, end, hours, hours * RATE_PER_HOUR, ref]);
     return { rsv: rows[0] };
