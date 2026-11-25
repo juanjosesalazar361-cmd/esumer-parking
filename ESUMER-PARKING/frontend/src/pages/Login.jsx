@@ -9,7 +9,7 @@ export default function Login() {
   const submit = async e => { e.preventDefault(); setErr(''); try { await login(f); nav('/'); } catch (x) { setErr(x.message); } };
   return (
     <div className="auth-page">
-       <Backdrop />
+      <Backdrop />
       <form className="auth-card" onSubmit={submit}>
         <div className="brand"><span className="brand-mark">P</span><div><strong>ESUMER</strong><small>Parking</small></div></div>
         <h1>Inicia sesión</h1>
@@ -19,7 +19,6 @@ export default function Login() {
         {err && <div className="alert">{err}</div>}
         <button className="btn primary">Entrar</button>
         <p className="muted">¿No tienes cuenta? <Link to="/registro">Crear cuenta</Link></p>
-        <p className="hint">Demo admin: admin@esumer.edu.co / admin123</p>
       </form>
     </div>
   );
